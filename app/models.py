@@ -19,3 +19,4 @@ class User(Base):
     blood_group = Column(String(5), nullable=True)
     conditions = Column(ARRAY(Text), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+#add1
