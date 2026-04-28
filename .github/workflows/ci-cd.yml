@@ -1,24 +1,17 @@
-# ─────────────────────────────────────────────────────────────
-# MediTrack User Service — CI/CD Pipeline
-# Triggers : push to dev or main
-# Templates : meditrack-project/meditrack-templates
-# dev  → auto deploy to meditrack-dev  (no approval)
-# main → approval gate → deploy to meditrack-prod
-# ─────────────────────────────────────────────────────────────
 name: "CI/CD — User Service"
 
 on:
   push:
-    branches:
-      - dev
-      - main
+    branches: [dev, main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: write
 
 jobs:
 
@@ -26,32 +19,23 @@ jobs:
     name: "1. SonarQube"
     uses: meditrack-project/meditrack-templates/.github/workflows/sonarqube.yml@main
     with:
-      service_name: meditrack-user-service
-      service_path: "."
+      service_name:      meditrack-user-service
+      service_path:      "."
       sonar_project_key: meditrack-user-service
-      language: python
-      python_version: "3.12"
-    secrets:
-      SONARQUBE_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-      SONARQUBE_URL:   ${{ secrets.SONARQUBE_URL }}
-      SMTP_USERNAME:   ${{ secrets.SMTP_USERNAME }}
-      SMTP_PASSWORD:   ${{ secrets.SMTP_PASSWORD }}
-      ALERT_EMAIL:     ${{ secrets.ALERT_EMAIL }}
+      language:          python
+      python_version:    "3.12"
+    secrets: inherit
 
   snyk:
     name: "2. Snyk SCA"
     needs: sonarqube
     uses: meditrack-project/meditrack-templates/.github/workflows/snyk.yml@main
     with:
-      service_name: meditrack-user-service
-      service_path: "."
-      language: python
+      service_name:   meditrack-user-service
+      service_path:   "."
+      language:       python
       python_version: "3.12"
-    secrets:
-      SNYK_TOKEN:    ${{ secrets.SNYK_TOKEN }}
-      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-      ALERT_EMAIL:   ${{ secrets.ALERT_EMAIL }}
+    secrets: inherit
 
   docker:
     name: "3-5. Docker Build → Trivy → Push"
@@ -64,14 +48,8 @@ jobs:
       docker_image_name: meditrack-user-service
       language:          python
       branch:            ${{ github.ref_name }}
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN:    ${{ secrets.DOCKERHUB_TOKEN }}
-      SMTP_USERNAME:      ${{ secrets.SMTP_USERNAME }}
-      SMTP_PASSWORD:      ${{ secrets.SMTP_PASSWORD }}
-      ALERT_EMAIL:        ${{ secrets.ALERT_EMAIL }}
+    secrets: inherit
 
-  # ── Dev: auto deploy (no approval needed) ─────────────────
   deploy-dev:
     name: "6. Deploy → Dev"
     needs: docker
@@ -83,13 +61,8 @@ jobs:
       image_tag:        ${{ needs.docker.outputs.image_tag }}
       environment:      dev
       version:          ${{ needs.docker.outputs.version }}
-    secrets:
-      GITOPS_TOKEN:  ${{ secrets.GITOPS_TOKEN }}
-      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-      ALERT_EMAIL:   ${{ secrets.ALERT_EMAIL }}
+    secrets: inherit
 
-  # ── Prod: approval gate first ──────────────────────────────
   approval:
     name: "6. Approval Gate → Prod"
     needs: docker
@@ -99,12 +72,8 @@ jobs:
       service_name:     meditrack-user-service
       image_tag:        ${{ needs.docker.outputs.image_tag }}
       helm_service_key: userService
-    secrets:
-      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-      ALERT_EMAIL:   ${{ secrets.ALERT_EMAIL }}
+    secrets: inherit
 
-  # ── Prod: deploy after approval ───────────────────────────
   deploy-prod:
     name: "7. Deploy → Prod"
     needs: [docker, approval]
@@ -116,8 +85,4 @@ jobs:
       image_tag:        ${{ needs.docker.outputs.image_tag }}
       environment:      prod
       version:          ${{ needs.docker.outputs.version }}
-    secrets:
-      GITOPS_TOKEN:  ${{ secrets.GITOPS_TOKEN }}
-      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
-      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-      ALERT_EMAIL:   ${{ secrets.ALERT_EMAIL }}
+    secrets: inherit
