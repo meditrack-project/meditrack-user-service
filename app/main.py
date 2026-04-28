@@ -78,3 +78,5 @@ async def health_check():
         "service": "user-service",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+#add1
